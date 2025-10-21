@@ -6,6 +6,7 @@ import { taskService } from '../services';
 import { taskGenerationService } from '../services/taskGenerationService';
 import { TaskList } from './tasks/TaskList';
 import { TaskForm } from './tasks/TaskForm';
+import { SettingsModal } from './settings/SettingsModal';
 import { Button } from './ui/Button';
 import {
   Plus,
@@ -20,6 +21,7 @@ export const Dashboard: React.FC = () => {
   const { user, signOut, hasPermission } = useAuth();
   const { addNotification } = useNotification();
   const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [generatingTasks, setGeneratingTasks] = useState(false);
@@ -125,11 +127,9 @@ export const Dashboard: React.FC = () => {
                 </Button>
               )}
 
-              {hasPermission('editSettings') && (
-                <Button variant="ghost" icon={Settings}>
-                  Configuración
-                </Button>
-              )}
+              <Button variant="ghost" icon={Settings} onClick={() => setSettingsOpen(true)}>
+                Configuración
+              </Button>
 
               <Button variant="ghost" icon={LogOut} onClick={signOut}>
                 Salir
@@ -167,6 +167,12 @@ export const Dashboard: React.FC = () => {
         onClose={handleCloseForm}
         task={editingTask}
         onSuccess={handleFormSuccess}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
       />
     </div>
   );
