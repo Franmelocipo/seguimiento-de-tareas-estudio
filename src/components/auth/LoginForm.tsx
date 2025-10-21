@@ -5,6 +5,7 @@ import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { LogIn, Database } from 'lucide-react';
 import { initializeDatabase } from '../../lib/firebase/initializeData';
+import { isDemoMode } from '../../lib/firebase/config';
 
 export const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -57,6 +58,11 @@ export const LoginForm: React.FC = () => {
             Sistema de Gestión Contable
           </h1>
           <p className="text-gray-600">Inicia sesión para continuar</p>
+          {isDemoMode && (
+            <div className="mt-3 inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
+              🎭 Modo DEMO - Sin Firebase
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -96,21 +102,33 @@ export const LoginForm: React.FC = () => {
           <p className="font-mono">admin@estudio.com / admin123</p>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full text-sm"
-            icon={Database}
-            onClick={handleInitializeDatabase}
-            disabled={initializing}
-          >
-            {initializing ? 'Inicializando...' : 'Inicializar Base de Datos'}
-          </Button>
-          <p className="mt-2 text-xs text-gray-500 text-center">
-            Solo para primera configuración
-          </p>
-        </div>
+        {!isDemoMode && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full text-sm"
+              icon={Database}
+              onClick={handleInitializeDatabase}
+              disabled={initializing}
+            >
+              {initializing ? 'Inicializando...' : 'Inicializar Base de Datos'}
+            </Button>
+            <p className="mt-2 text-xs text-gray-500 text-center">
+              Solo para primera configuración
+            </p>
+          </div>
+        )}
+
+        {isDemoMode && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <p className="text-xs text-center text-gray-600">
+              💡 La base de datos se inicializa automáticamente en modo demo.
+              <br />
+              Solo inicia sesión con las credenciales de arriba.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

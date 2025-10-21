@@ -11,11 +11,23 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-export const app = initializeApp(firebaseConfig);
+// Check if Firebase is configured
+export const isFirebaseConfigured = !!(
+  firebaseConfig.apiKey &&
+  firebaseConfig.apiKey !== 'your_api_key' &&
+  firebaseConfig.projectId &&
+  firebaseConfig.projectId !== 'your_project_id'
+);
 
-// Initialize Firebase Authentication
-export const auth = getAuth(app);
+// Initialize Firebase only if configured
+export const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
+export const auth = isFirebaseConfigured ? getAuth(app!) : null;
+export const db = isFirebaseConfigured ? getFirestore(app!) : null;
 
-// Initialize Cloud Firestore
-export const db = getFirestore(app);
+// Export demo mode flag
+export const isDemoMode = !isFirebaseConfigured;
+
+if (isDemoMode) {
+  console.log('🎭 Modo DEMO activado - Usando almacenamiento local');
+  console.log('💡 Para usar Firebase, configura las variables de entorno en .env');
+}

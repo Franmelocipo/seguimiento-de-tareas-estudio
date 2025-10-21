@@ -48,18 +48,21 @@ export class FirestoreService<T extends { id: string }> {
 
   constructor(collectionName: string) {
     this.collectionName = collectionName;
+    if (!db) {
+      throw new Error('Firebase no está configurado. Usa el modo demo o configura las credenciales.');
+    }
   }
 
   // Create
   async create(data: Omit<T, 'id'>): Promise<T> {
     const preparedData = prepareDateForFirestore(data);
-    const docRef = await addDoc(collection(db, this.collectionName), preparedData);
+    const docRef = await addDoc(collection(db!, this.collectionName), preparedData);
     return { id: docRef.id, ...data } as T;
   }
 
   // Read one
   async getById(id: string): Promise<T | null> {
-    const docRef = doc(db, this.collectionName, id);
+    const docRef = doc(db!, this.collectionName, id);
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) {
@@ -72,7 +75,7 @@ export class FirestoreService<T extends { id: string }> {
 
   // Read all
   async getAll(constraints: QueryConstraint[] = []): Promise<T[]> {
-    const q = query(collection(db, this.collectionName), ...constraints);
+    const q = query(collection(db!, this.collectionName), ...constraints);
     const querySnapshot = await getDocs(q);
 
     return querySnapshot.docs.map((doc) => {
@@ -88,7 +91,7 @@ export class FirestoreService<T extends { id: string }> {
     value: any
   ): Promise<T[]> {
     const q = query(
-      collection(db, this.collectionName),
+      collection(db!, this.collectionName),
       where(field, operator, value)
     );
     const querySnapshot = await getDocs(q);
@@ -101,14 +104,14 @@ export class FirestoreService<T extends { id: string }> {
 
   // Update
   async update(id: string, data: Partial<Omit<T, 'id'>>): Promise<void> {
-    const docRef = doc(db, this.collectionName, id);
+    const docRef = doc(db!, this.collectionName, id);
     const preparedData = prepareDateForFirestore(data);
     await updateDoc(docRef, preparedData);
   }
 
   // Delete
   async delete(id: string): Promise<void> {
-    const docRef = doc(db, this.collectionName, id);
+    const docRef = doc(db!, this.collectionName, id);
     await deleteDoc(docRef);
   }
 

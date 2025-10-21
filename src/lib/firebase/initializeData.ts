@@ -1,34 +1,50 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from './config';
+import { isDemoMode } from './config';
 import { authService } from '../../services/authService';
 import {
   roleService,
   taskTypeService,
   standardTaskService,
   dueDateService,
+  clientService,
+  taskService,
 } from '../../services';
 import { defaultRoles } from '../../data/roles';
 import { defaultTaskTypes } from '../../data/taskTypes';
 import { defaultStandardTasks } from '../../data/standardTasks';
 import { defaultDueDates } from '../../data/dueDates';
 
+const INIT_FLAG = isDemoMode ? 'demo_initialized' : 'firebase_initialized';
+
+/**
+ * Check if database is already initialized
+ */
+export async function isInitialized(): Promise<boolean> {
+  if (isDemoMode) {
+    return localStorage.getItem(INIT_FLAG) === 'true';
+  }
+
+  // For Firebase, check the system collection
+  const { doc, getDoc } = await import('firebase/firestore');
+  const { db } = await import('./config');
+  const initDoc = await getDoc(doc(db!, 'system', 'initialized'));
+  return initDoc.exists();
+}
+
 /**
  * Initialize the database with default data
- * This should be run once when setting up a new instance
  */
 export async function initializeDatabase() {
-  console.log('Initializing database...');
+  console.log(`🚀 Inicializando base de datos (${isDemoMode ? 'DEMO' : 'Firebase'})...`);
 
   try {
     // Check if already initialized
-    const initDoc = await getDoc(doc(db, 'system', 'initialized'));
-    if (initDoc.exists()) {
-      console.log('Database already initialized');
+    if (await isInitialized()) {
+      console.log('✅ Base de datos ya inicializada');
       return;
     }
 
     // Create roles
-    console.log('Creating roles...');
+    console.log('📝 Creando roles...');
     const roleIds: { [key: string]: string } = {};
     for (const role of defaultRoles) {
       const createdRole = await roleService.create({
@@ -40,7 +56,7 @@ export async function initializeDatabase() {
     }
 
     // Create admin user
-    console.log('Creating admin user...');
+    console.log('👤 Creando usuario admin...');
     try {
       await authService.createUser(
         'admin@estudio.com',
@@ -49,27 +65,24 @@ export async function initializeDatabase() {
         roleIds['Administrador']
       );
     } catch (error: any) {
-      // If user already exists, that's fine
-      if (error.code !== 'auth/email-already-in-use') {
+      if (error.code !== 'auth/email-already-in-use' && !error.message?.includes('incorrectos')) {
         throw error;
       }
     }
 
     // Create task types
-    console.log('Creating task types...');
+    console.log('📋 Creando tipos de tarea...');
     const taskTypeIds: { [key: string]: string } = {};
     for (const taskType of defaultTaskTypes) {
       const createdType = await taskTypeService.create(taskType);
       taskTypeIds[taskType.name] = createdType.id;
     }
 
-    // Create standard tasks (update taskTypeId references)
-    console.log('Creating standard tasks...');
+    // Create standard tasks
+    console.log('⚙️  Creando tareas estándar...');
     for (const standardTask of defaultStandardTasks) {
-      // Map the placeholder taskTypeId to the actual ID
       let taskTypeId = standardTask.taskTypeId;
 
-      // Map placeholder IDs to actual task type names
       const taskTypeMap: { [key: string]: string } = {
         'impuestos': 'Impuestos',
         'laboral': 'Laboral',
@@ -88,12 +101,11 @@ export async function initializeDatabase() {
       });
     }
 
-    // Create due dates (update taskTypeId references)
-    console.log('Creating due dates...');
+    // Create due dates
+    console.log('📅 Creando vencimientos...');
     for (const dueDate of defaultDueDates) {
       let taskTypeId = dueDate.taskTypeId;
 
-      // Map placeholder to actual ID
       if (taskTypeId === 'impuestos' && taskTypeIds['Impuestos']) {
         taskTypeId = taskTypeIds['Impuestos'];
       } else if (taskTypeId === 'laboral' && taskTypeIds['Laboral']) {
@@ -108,28 +120,122 @@ export async function initializeDatabase() {
       });
     }
 
-    // Mark as initialized
-    await setDoc(doc(db, 'system', 'initialized'), {
-      initialized: true,
-      timestamp: new Date().toISOString(),
-    });
+    // Create demo clients
+    console.log('👥 Creando clientes de ejemplo...');
+    const demoClients = [
+      {
+        name: 'Comercial San Martín SA',
+        cuit: '30-71234567-8',
+        businessName: 'Comercial San Martín Sociedad Anónima',
+        email: 'info@comercialsanmartin.com',
+        phone: '011-4567-8900',
+        fiscalClosingMonth: 12,
+        assignedStandardTasks: [],
+        active: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        name: 'Tech Solutions SRL',
+        cuit: '30-71234568-9',
+        businessName: 'Tech Solutions Sociedad de Responsabilidad Limitada',
+        email: 'contacto@techsolutions.com',
+        phone: '011-5678-9012',
+        fiscalClosingMonth: 12,
+        assignedStandardTasks: [],
+        active: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        name: 'Consultora Río de la Plata',
+        cuit: '30-71234569-0',
+        businessName: 'Consultora Río de la Plata SRL',
+        email: 'info@rioplata.com',
+        phone: '011-6789-0123',
+        fiscalClosingMonth: 6,
+        assignedStandardTasks: [],
+        active: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
 
-    console.log('Database initialization complete!');
-    alert('Base de datos inicializada correctamente.\n\nUsuario admin creado:\nEmail: admin@estudio.com\nContraseña: admin123');
+    for (const client of demoClients) {
+      await clientService.create(client);
+    }
+
+    // Create demo tasks
+    console.log('✅ Creando tareas de ejemplo...');
+    const clients = await clientService.getAll();
+    const taskTypes = await taskTypeService.getAll();
+    const impuestosType = taskTypes.find(t => t.name === 'Impuestos');
+    const laboralType = taskTypes.find(t => t.name === 'Laboral');
+
+    if (clients.length > 0 && impuestosType) {
+      const demoTasks = [
+        {
+          title: `IVA Mensual - ${clients[0].name}`,
+          description: 'Declaración jurada mensual de IVA',
+          clientId: clients[0].id,
+          taskTypeId: impuestosType.id,
+          status: 'pending' as const,
+          priority: true,
+          dueDate: new Date(new Date().setDate(new Date().getDate() + 5)),
+          requiredDocuments: ['Facturas de compra', 'Facturas de venta'],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          title: `SUSS - ${clients[0].name}`,
+          description: 'Sistema Único de Seguridad Social',
+          clientId: clients[0].id,
+          taskTypeId: laboralType?.id || impuestosType.id,
+          status: 'in_progress' as const,
+          priority: false,
+          dueDate: new Date(new Date().setDate(new Date().getDate() + 3)),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+
+      for (const task of demoTasks) {
+        await taskService.create(task);
+      }
+    }
+
+    // Mark as initialized
+    if (isDemoMode) {
+      localStorage.setItem(INIT_FLAG, 'true');
+    } else {
+      const { doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('./config');
+      await setDoc(doc(db!, 'system', 'initialized'), {
+        initialized: true,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    console.log('🎉 Base de datos inicializada correctamente!');
+
+    if (isDemoMode) {
+      alert('✅ Base de datos inicializada en modo DEMO\n\nUsuario admin creado:\n📧 Email: admin@estudio.com\n🔑 Contraseña: admin123\n\nSe crearon 3 clientes y 2 tareas de ejemplo.');
+    } else {
+      alert('✅ Base de datos inicializada correctamente\n\nUsuario admin creado:\n📧 Email: admin@estudio.com\n🔑 Contraseña: admin123');
+    }
   } catch (error) {
-    console.error('Error initializing database:', error);
+    console.error('❌ Error al inicializar base de datos:', error);
     alert('Error al inicializar la base de datos. Ver consola para detalles.');
     throw error;
   }
 }
 
 /**
- * Reset the initialization flag (use with caution!)
+ * Auto-initialize in demo mode if not already initialized
  */
-export async function resetInitialization() {
-  await setDoc(doc(db, 'system', 'initialized'), {
-    initialized: false,
-    timestamp: new Date().toISOString(),
-  });
-  console.log('Initialization reset');
+export async function autoInitializeIfNeeded() {
+  if (isDemoMode && !(await isInitialized())) {
+    console.log('🎭 Modo DEMO detectado - Inicializando automáticamente...');
+    await initializeDatabase();
+  }
 }

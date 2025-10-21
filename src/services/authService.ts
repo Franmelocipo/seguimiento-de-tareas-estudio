@@ -6,14 +6,22 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase/config';
+import { auth, db, isDemoMode } from '../lib/firebase/config';
+import { LocalAuthService } from './localStorageService';
 import type { User } from '../types';
+
+// Create local auth service instance for demo mode
+const localAuth = new LocalAuthService();
 
 export const authService = {
   // Sign in
   async signIn(email: string, password: string): Promise<User> {
+    if (isDemoMode) {
+      return await localAuth.signIn(email, password);
+    }
+
     const userCredential = await signInWithEmailAndPassword(
-      auth,
+      auth!,
       email,
       password
     );
@@ -26,7 +34,10 @@ export const authService = {
 
   // Sign out
   async signOut(): Promise<void> {
-    await firebaseSignOut(auth);
+    if (isDemoMode) {
+      return await localAuth.signOut();
+    }
+    await firebaseSignOut(auth!);
   },
 
   // Create user
@@ -36,8 +47,12 @@ export const authService = {
     displayName: string,
     roleId: string
   ): Promise<User> {
+    if (isDemoMode) {
+      return await localAuth.createUser(email, password, displayName, roleId);
+    }
+
     const userCredential = await createUserWithEmailAndPassword(
-      auth,
+      auth!,
       email,
       password
     );
@@ -51,7 +66,7 @@ export const authService = {
       updatedAt: new Date(),
     };
 
-    await setDoc(doc(db, 'users', userCredential.user.uid), {
+    await setDoc(doc(db!, 'users', userCredential.user.uid), {
       ...newUser,
       createdAt: newUser.createdAt.toISOString(),
       updatedAt: newUser.updatedAt.toISOString(),
@@ -62,7 +77,11 @@ export const authService = {
 
   // Get user data
   async getUserData(userId: string): Promise<User | null> {
-    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (isDemoMode) {
+      return await localAuth.getUserData(userId);
+    }
+
+    const userDoc = await getDoc(doc(db!, 'users', userId));
     if (!userDoc.exists()) {
       return null;
     }
@@ -83,7 +102,11 @@ export const authService = {
     userId: string,
     updates: Partial<Omit<User, 'id' | 'createdAt'>>
   ): Promise<void> {
-    await updateDoc(doc(db, 'users', userId), {
+    if (isDemoMode) {
+      return await localAuth.updateUser(userId, updates);
+    }
+
+    await updateDoc(doc(db!, 'users', userId), {
       ...updates,
       updatedAt: new Date().toISOString(),
     });
@@ -91,11 +114,23 @@ export const authService = {
 
   // Auth state observer
   onAuthStateChange(callback: (user: FirebaseUser | null) => void): () => void {
-    return onAuthStateChanged(auth, callback);
+    if (isDemoMode) {
+      return localAuth.onAuthStateChange((user) => {
+        // Transform local user to look like Firebase user
+        callback(user ? { uid: user.id, email: user.email } as any : null);
+      });
+    }
+
+    return onAuthStateChanged(auth!, callback);
   },
 
   // Get current user
   getCurrentUser(): FirebaseUser | null {
-    return auth.currentUser;
+    if (isDemoMode) {
+      const user = localAuth.getCurrentUser();
+      return user ? { uid: user.id, email: user.email } as any : null;
+    }
+
+    return auth!.currentUser;
   },
 };
